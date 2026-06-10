@@ -1,28 +1,62 @@
-<!DOCTYPE html>
-<html>
+<!DOCTYPE html><html>
 <head>
 <title>Management</title>
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<style>
-body{font-family:Arial;background:#f5f5f5}
-.card{background:white;margin:10px;padding:15px;border-radius:12px}
-button{margin:5px;padding:8px}
-.approve{background:green;color:white}
-.reject{background:red;color:white}
-</style>
-</head>
-<body>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"><style>
+body{
+font-family:Arial;
+background:#f5f5f5;
+padding:20px;
+}
 
-<h2>Post Management</h2>
-<a href="dashboard.html">Back</a>
+.card{
+background:white;
+margin-bottom:15px;
+padding:15px;
+border-radius:12px;
+box-shadow:0 2px 10px rgba(0,0,0,.08);
+}
 
-<div id="list"></div>
+button{
+padding:10px;
+margin:5px;
+border:none;
+border-radius:6px;
+cursor:pointer;
+}
 
-<script type="module">
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+.approve{
+background:green;
+color:white;
+}
+
+.reject{
+background:red;
+color:white;
+}
+
+img{
+max-width:250px;
+border-radius:10px;
+margin-top:10px;
+}
+
+a{
+display:inline-block;
+margin-bottom:20px;
+}
+</style></head>
+<body><h2>Post Management</h2><a href="dashboard.html">← Back to Dashboard</a>
+
+<div id="list"></div><script type="module">
+
+import { initializeApp }
+from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+
 import {
-getAuth,onAuthStateChanged
-} from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+getAuth,
+onAuthStateChanged
+}
+from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 
 import {
 getFirestore,
@@ -33,41 +67,104 @@ getDoc,
 setDoc,
 updateDoc,
 serverTimestamp
-} from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+}
+from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
-const app = initializeApp({
-apiKey:"AIzaSyBoSJggPoHfiI2quek_5m5G9PSAhSaXFZE",
+const firebaseConfig = {
+apiKey:"AIzaSyBoSJggPoHfiI2quek_5mV5gPSAhSaXFZE",
 authDomain:"web-wardrobe.firebaseapp.com",
-projectId:"web-wardrobe"
-});
+projectId:"web-wardrobe",
+storageBucket:"web-wardrobe.appspot.com",
+messagingSenderId:"201587857341",
+appId:"1:201587857341:web:044fe04f2503168881a4d4"
+};
 
+const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
-onAuthStateChanged(auth,user=>{
-if(!user) location.href="login.html";
+const ADMIN_EMAIL = "admin@webwardrobe.name.ng";
+
+onAuthStateChanged(auth,(user)=>{
+
+if(!user){
+location.href="login.html";
+return;
+}
+
+if(user.email !== ADMIN_EMAIL){
+alert("Access denied");
+location.href="login.html";
+return;
+}
+
 load();
+
 });
 
 async function load(){
 
-const snap = await getDocs(collection(db,"businessSubmissions"));
 const list = document.getElementById("list");
-list.innerHTML="";
+
+list.innerHTML = "Loading...";
+
+const snap = await getDocs(
+collection(db,"businessSubmissions")
+);
+
+list.innerHTML = "";
 
 snap.forEach(d=>{
 
 const data = d.data();
 
 const div = document.createElement("div");
-div.className="card";
+
+div.className = "card";
 
 div.innerHTML = `
-<b>${data.title}</b><br>
-<small>${data.category} | ${data.status}</small><br>
+<h3>${data.title || ""}</h3>
 
-<button class="approve" onclick="approve('${d.id}')">Approve</button>
-<button class="reject" onclick="reject('${d.id}')">Reject</button>
+<p>
+<b>Category:</b> ${data.category || ""}
+</p>
+
+<p>
+<b>Status:</b> ${data.status || "pending"}
+</p>
+
+<p>
+<b>Email:</b> ${data.email || ""}
+</p>
+
+<p>
+<b>Promotion:</b>
+${data.promotionType || "affiliate"}
+</p>
+
+${data.promotionType === "sponsored"
+? `<p><b>Sponsored Post (₦2500)</b></p>`
+: `<p><b>Affiliate Post (Free)</b></p>`
+}
+
+${data.paymentProof
+? `<img src="${data.paymentProof}">`
+: ""
+}
+
+<br>
+
+<button
+class="approve"
+onclick="approveSubmission('${d.id}')">
+Approve
+</button>
+
+<button
+class="reject"
+onclick="rejectSubmission('${d.id}')">
+Reject
+</button>
 `;
 
 list.appendChild(div);
@@ -76,37 +173,65 @@ list.appendChild(div);
 
 }
 
-window.approve = async function(id){
+window.approveSubmission = async function(id){
 
-const ref = doc(db,"businessSubmissions",id);
+const ref = doc(
+db,
+"businessSubmissions",
+id
+);
+
 const snap = await getDoc(ref);
+
+if(!snap.exists()){
+alert("Submission not found");
+return;
+}
+
 const data = snap.data();
 
-await setDoc(doc(db,"posts",id),{
+await setDoc(
+doc(db,"posts",id),
+{
 title:data.title,
-category:data.category.toLowerCase(),
+category:data.category,
 shortDescription:data.shortDescription,
 longDescription:data.longDescription,
-media:data.media,
+media:data.media || [],
 affiliateLink:data.affiliateLink || "",
-createdAt:serverTimestamp(),
+websiteUrl:data.websiteUrl || "",
+isSponsored:
+data.promotionType === "sponsored",
 views:0,
-status:"published"
+status:"published",
+createdAt:serverTimestamp()
+}
+);
+
+await updateDoc(ref,{
+status:"approved"
 });
 
-await updateDoc(ref,{status:"approved"});
+alert("Post approved and published");
 
 load();
+
 };
 
-window.reject = async function(id){
-await updateDoc(doc(db,"businessSubmissions",id),{
+window.rejectSubmission = async function(id){
+
+await updateDoc(
+doc(db,"businessSubmissions",id),
+{
 status:"rejected"
-});
+}
+);
+
+alert("Post rejected");
 
 load();
-};
-</script>
 
-</body>
+};
+
+</script></body>
 </html>
