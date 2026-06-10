@@ -23,12 +23,14 @@ button{width:100%;padding:10px;background:#e60023;color:white;border:none}
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getAuth, signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 
-const app = initializeApp({
-apiKey:"AIzaSyBoSJggPoHfiI2quek_5m5G9PSAhSaXFZE",
-authDomain:"web-wardrobe.firebaseapp.com",
-projectId:"web-wardrobe",
-appId:"1:201587857341:web:044fe04f2503168881a4d4"
-});
+const firebaseConfig = {
+  apiKey: "AIzaSyBoSJggPoHfiI2quek_5mV5gPSAhSaXFZE",
+  authDomain: "web-wardrobe.firebaseapp.com",
+  projectId: "web-wardrobe",
+  storageBucket: "web-wardrobe.appspot.com",
+  messagingSenderId: "201587857341",
+  appId: "1:201587857341:web:044fe04f2503168881a4d4"
+};
 
 const auth = getAuth(app);
 
