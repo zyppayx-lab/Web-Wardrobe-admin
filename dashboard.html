@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Dashboard</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+body{font-family:Arial;background:#f5f5f5}
+.container{padding:20px}
+.card{background:white;padding:20px;margin:10px;border-radius:12px}
+a{margin-right:10px}
+</style>
+</head>
+<body>
+
+<div class="container">
+
+<h1>Admin Dashboard</h1>
+
+<a href="management.html">Manage Posts</a>
+<a href="login.html" onclick="logout()">Logout</a>
+
+<div class="card" id="news">Newsletter: 0</div>
+<div class="card" id="biz">Business: 0</div>
+<div class="card" id="pending">Pending: 0</div>
+<div class="card" id="revenue">Revenue: ₦0</div>
+
+</div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+import { getFirestore, collection, getDocs } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+const app = initializeApp({
+apiKey:"AIzaSyBoSJggPoHfiI2quek_5m5G9PSAhSaXFZE",
+authDomain:"web-wardrobe.firebaseapp.com",
+projectId:"web-wardrobe"
+});
+
+const auth = getAuth(app);
+const db = getFirestore(app);
+
+onAuthStateChanged(auth,user=>{
+if(!user) location.href="login.html";
+loadStats();
+});
+
+async function loadStats(){
+
+const news = await getDocs(collection(db,"newsletterSubscribers"));
+const biz = await getDocs(collection(db,"businessSubmissions"));
+
+let pending = 0;
+let revenue = 0;
+
+biz.forEach(d=>{
+const data = d.data();
+if(data.status==="pending") pending++;
+if(data.status==="approved" && data.promotionType==="sponsored") revenue += 5000;
+});
+
+document.getElementById("news").innerText = "Newsletter: " + news.size;
+document.getElementById("biz").innerText = "Business: " + biz.size;
+document.getElementById("pending").innerText = "Pending: " + pending;
+document.getElementById("revenue").innerText = "Revenue: ₦" + revenue;
+}
+
+window.logout = async function(){
+await signOut(auth);
+};
+</script>
+
+</body>
+</html>
