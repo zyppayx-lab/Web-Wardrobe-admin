@@ -32,15 +32,29 @@ appId:"1:201587857341:web:044fe04f2503168881a4d4"
 
 const auth = getAuth(app);
 
-window.login = async function(){
-const email = document.getElementById("email").value;
-const pass = document.getElementById("password").value;
+// IMPORTANT: expose function safely
+document.querySelector("button").addEventListener("click", login);
 
-await signInWithEmailAndPassword(auth,email,pass);
+async function login(){
 
-location.href="dashboard.html";
-};
-</script>
+const email = document.getElementById("email").value.trim();
+const password = document.getElementById("password").value.trim();
 
+if(!email || !password){
+alert("Enter email and password");
+return;
+}
+
+try {
+await signInWithEmailAndPassword(auth, email, password);
+alert("Login successful");
+location.href = "dashboard.html";
+} catch (error) {
+alert("Login failed: " + error.message);
+console.error(error);
+}
+
+}
+  </script>
 </body>
   </html>
