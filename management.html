@@ -10,10 +10,16 @@ padding:20px;
 
 .card{
 background:white;
-margin-bottom:15px;
 padding:15px;
+margin-bottom:15px;
 border-radius:12px;
 box-shadow:0 2px 10px rgba(0,0,0,.08);
+}
+
+img{
+max-width:300px;
+margin-top:10px;
+border-radius:10px;
 }
 
 button{
@@ -34,20 +40,14 @@ background:red;
 color:white;
 }
 
-img{
-max-width:250px;
-border-radius:10px;
-margin-top:10px;
-}
-
 a{
 display:inline-block;
 margin-bottom:20px;
 }
 </style></head>
-<body><h2>Post Management</h2><a href="dashboard.html">← Back to Dashboard</a>
+<body><h2>Pending Business Submissions</h2><a href="dashboard.html">← Back to Dashboard</a>
 
-<div id="list"></div><script type="module">
+<div id="list">Loading...</div><script type="module">
 
 import { initializeApp }
 from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
@@ -61,6 +61,8 @@ from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 import {
 getFirestore,
 collection,
+query,
+where,
 getDocs,
 doc,
 getDoc,
@@ -98,25 +100,31 @@ location.href="login.html";
 return;
 }
 
-load();
+loadPending();
 
 });
 
-async function load(){
+async function loadPending(){
 
 const list = document.getElementById("list");
 
-list.innerHTML = "Loading...";
-
-const snap = await getDocs(
-collection(db,"businessSubmissions")
+const q = query(
+collection(db,"businessSubmissions"),
+where("status","==","pending")
 );
+
+const snap = await getDocs(q);
 
 list.innerHTML = "";
 
-snap.forEach(d=>{
+if(snap.empty){
+list.innerHTML = "<p>No pending submissions.</p>";
+return;
+}
 
-const data = d.data();
+snap.forEach(docSnap=>{
+
+const data = docSnap.data();
 
 const div = document.createElement("div");
 
@@ -125,44 +133,34 @@ div.className = "card";
 div.innerHTML = `
 <h3>${data.title || ""}</h3>
 
-<p>
-<b>Category:</b> ${data.category || ""}
-</p>
+<p><b>Email:</b> ${data.email || ""}</p>
 
-<p>
-<b>Status:</b> ${data.status || "pending"}
-</p>
+<p><b>Category:</b> ${data.category || ""}</p>
 
-<p>
-<b>Email:</b> ${data.email || ""}
-</p>
+<p><b>Promotion:</b> ${data.promotionType || "affiliate"}</p>
 
-<p>
-<b>Promotion:</b>
-${data.promotionType || "affiliate"}
-</p>
+<p><b>Status:</b> ${data.status}</p>
 
-${data.promotionType === "sponsored"
-? `<p><b>Sponsored Post (₦2500)</b></p>`
-: `<p><b>Affiliate Post (Free)</b></p>`
-}
+<p>${data.shortDescription || ""}</p>
 
-${data.paymentProof
-? `<img src="${data.paymentProof}">`
-: ""
-}
+${data.paymentProof ? `
+<h4>Payment Screenshot</h4>
+<img src="${data.paymentProof}">
+` : `
+<p>No payment screenshot uploaded.</p>
+`}
 
 <br>
 
 <button
 class="approve"
-onclick="approveSubmission('${d.id}')">
+onclick="approveSubmission('${docSnap.id}')">
 Approve
 </button>
 
 <button
 class="reject"
-onclick="rejectSubmission('${d.id}')">
+onclick="rejectSubmission('${docSnap.id}')">
 Reject
 </button>
 `;
@@ -175,11 +173,7 @@ list.appendChild(div);
 
 window.approveSubmission = async function(id){
 
-const ref = doc(
-db,
-"businessSubmissions",
-id
-);
+const ref = doc(db,"businessSubmissions",id);
 
 const snap = await getDoc(ref);
 
@@ -190,18 +184,25 @@ return;
 
 const data = snap.data();
 
+if(
+data.promotionType === "sponsored"
+&& !data.paymentProof
+){
+alert("Sponsored post requires payment screenshot.");
+return;
+}
+
 await setDoc(
 doc(db,"posts",id),
 {
 title:data.title,
-category:data.category,
+category:data.category.toLowerCase(),
 shortDescription:data.shortDescription,
 longDescription:data.longDescription,
 media:data.media || [],
 affiliateLink:data.affiliateLink || "",
 websiteUrl:data.websiteUrl || "",
-isSponsored:
-data.promotionType === "sponsored",
+isSponsored:data.promotionType==="sponsored",
 views:0,
 status:"published",
 createdAt:serverTimestamp()
@@ -214,7 +215,7 @@ status:"approved"
 
 alert("Post approved and published");
 
-load();
+loadPending();
 
 };
 
@@ -229,7 +230,7 @@ status:"rejected"
 
 alert("Post rejected");
 
-load();
+loadPending();
 
 };
 
