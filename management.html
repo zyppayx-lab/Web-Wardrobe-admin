@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Management</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+body{font-family:Arial;background:#f5f5f5}
+.card{background:white;margin:10px;padding:15px;border-radius:12px}
+button{margin:5px;padding:8px}
+.approve{background:green;color:white}
+.reject{background:red;color:white}
+</style>
+</head>
+<body>
+
+<h2>Post Management</h2>
+<a href="dashboard.html">Back</a>
+
+<div id="list"></div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import {
+getAuth,onAuthStateChanged
+} from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+
+import {
+getFirestore,
+collection,
+getDocs,
+doc,
+getDoc,
+setDoc,
+updateDoc,
+serverTimestamp
+} from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+const app = initializeApp({
+apiKey:"AIzaSyBoSJggPoHfiI2quek_5m5G9PSAhSaXFZE",
+authDomain:"web-wardrobe.firebaseapp.com",
+projectId:"web-wardrobe"
+});
+
+const auth = getAuth(app);
+const db = getFirestore(app);
+
+onAuthStateChanged(auth,user=>{
+if(!user) location.href="login.html";
+load();
+});
+
+async function load(){
+
+const snap = await getDocs(collection(db,"businessSubmissions"));
+const list = document.getElementById("list");
+list.innerHTML="";
+
+snap.forEach(d=>{
+
+const data = d.data();
+
+const div = document.createElement("div");
+div.className="card";
+
+div.innerHTML = `
+<b>${data.title}</b><br>
+<small>${data.category} | ${data.status}</small><br>
+
+<button class="approve" onclick="approve('${d.id}')">Approve</button>
+<button class="reject" onclick="reject('${d.id}')">Reject</button>
+`;
+
+list.appendChild(div);
+
+});
+
+}
+
+window.approve = async function(id){
+
+const ref = doc(db,"businessSubmissions",id);
+const snap = await getDoc(ref);
+const data = snap.data();
+
+await setDoc(doc(db,"posts",id),{
+title:data.title,
+category:data.category.toLowerCase(),
+shortDescription:data.shortDescription,
+longDescription:data.longDescription,
+media:data.media,
+affiliateLink:data.affiliateLink || "",
+createdAt:serverTimestamp(),
+views:0,
+status:"published"
+});
+
+await updateDoc(ref,{status:"approved"});
+
+load();
+};
+
+window.reject = async function(id){
+await updateDoc(doc(db,"businessSubmissions",id),{
+status:"rejected"
+});
+
+load();
+};
+</script>
+
+</body>
+</html>
