@@ -37,7 +37,7 @@ font-weight:600;
 .approve{background:green;color:white;}
 .reject{background:red;color:white;}
 .view{background:#007bff;color:white;}
-.edit{background:#111;color:white;color:white;}
+.edit{background:#111;color:white;}
 
 input, textarea{
 width:100%;
@@ -64,12 +64,7 @@ color:#555;
 <script type="module">
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-
-import {
-getAuth,
-onAuthStateChanged
-} from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-
+import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 import {
 getFirestore,
 collection,
@@ -82,9 +77,9 @@ updateDoc,
 setDoc
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
-/* FIREBASE CONFIG */
+/* FIREBASE */
 const firebaseConfig = {
-apiKey: "AIzaSyBoSJggPoHfiI2quek_5mV5gPSAhSaXFZE",
+apiKey: "AIzaSyBoSJggPoHfiI2quek_5m5GPSAhSaXFZE",
 authDomain: "web-wardrobe.firebaseapp.com",
 projectId: "web-wardrobe",
 storageBucket: "web-wardrobe.appspot.com",
@@ -98,29 +93,28 @@ const db = getFirestore(app);
 
 const ADMIN_EMAIL = "admin@webwardrobe.name.ng";
 
-/* 🔥 FIX 1: SAFE AUTH HANDLING (NO AUTO FALSE REDIRECT) */
-function waitForAuth() {
-return new Promise((resolve) => {
-const unsub = onAuthStateChanged(auth, (user) => {
-unsub();
+/* SAFE AUTH */
+function waitForAuth(){
+return new Promise(resolve=>{
+onAuthStateChanged(auth,user=>{
 resolve(user);
 });
 });
 }
 
-/* START APP ONLY AFTER AUTH IS READY */
+/* INIT */
 (async () => {
 
 const user = await waitForAuth();
 
-if (!user) {
-location.href = "login.html";
+if(!user){
+location.href="login.html";
 return;
 }
 
-if (user.email !== ADMIN_EMAIL) {
+if(user.email !== ADMIN_EMAIL){
 alert("Access denied");
-location.href = "login.html";
+location.href="login.html";
 return;
 }
 
@@ -128,7 +122,26 @@ loadPending();
 
 })();
 
-/* LOAD PENDING POSTS */
+/* =========================
+SLUG SYSTEM (AUTO GENERATOR)
+========================= */
+
+function slugify(text){
+return text
+.toLowerCase()
+.trim()
+.replace(/[^a-z0-9\s-]/g,"")
+.replace(/\s+/g,"-")
+.replace(/-+/g,"-");
+}
+
+function generateSlug(title, id){
+const base = slugify(title || "post");
+const shortId = id.slice(0,5);
+return `${base}-${shortId}`;
+}
+
+/* LOAD POSTS */
 async function loadPending(){
 
 const list = document.getElementById("list");
@@ -157,8 +170,8 @@ div.className = "card";
 div.innerHTML = `
 <h3>${d.title}</h3>
 
-<p class="small"><b>Category:</b> ${d.category}</p>
 <p class="small"><b>Email:</b> ${d.email}</p>
+<p class="small"><b>Category:</b> ${d.category}</p>
 <p class="small"><b>Type:</b> ${d.promotionType}</p>
 
 <h4>Short Description</h4>
@@ -183,12 +196,9 @@ ${d.paymentProof ? `
 <h4>Reject Reason</h4>
 <input id="reason-${docSnap.id}" placeholder="Optional reason">
 
-<br>
-
 <button class="view" onclick="openLink('${d.websiteUrl || ""}')">Check Link</button>
 <button class="approve" onclick="approve('${docSnap.id}')">Approve</button>
 <button class="reject" onclick="reject('${docSnap.id}')">Reject</button>
-
 `;
 
 list.appendChild(div);
@@ -197,16 +207,19 @@ list.appendChild(div);
 
 }
 
-/* SAFE LINK CHECK */
+/* OPEN LINK */
 window.openLink = function(url){
 if(!url){
 alert("No URL provided");
 return;
 }
-window.open(url, "_blank");
+window.open(url,"_blank");
 };
 
-/* APPROVE POST */
+/* =========================
+APPROVE POST (FIXED + SLUG)
+========================= */
+
 window.approve = async function(id){
 
 const ref = doc(db,"businessSubmissions",id);
@@ -216,24 +229,18 @@ if(!snap.exists()) return;
 
 const d = snap.data();
 
-/* slug generator */
-function slugify(text){
-return text.toLowerCase()
-.trim()
-.replace(/[^a-z0-9\s-]/g,"")
-.replace(/\s+/g,"-")
-.replace(/-+/g,"-");
-}
+/* AUTO SLUG */
+const slug = generateSlug(d.title, id);
 
-const slug = slugify(d.title || "");
-
-/* publish to posts collection */
+/* PUBLISH TO POSTS */
 await setDoc(doc(db,"posts",id),{
 title: d.title,
-slug,
+slug: slug, // 🔥 CRITICAL FIX
 category: (d.category || "lifestyle").toLowerCase(),
+
 shortDescription: d.shortDescription,
 longDescription: d.longDescription,
+
 media: d.media || [],
 
 affiliateLink: d.affiliateLink || "",
@@ -248,16 +255,17 @@ createdAt: Date.now(),
 updatedAt: Date.now()
 });
 
-/* mark submission approved */
+/* UPDATE SUBMISSION */
 await updateDoc(ref,{
-status:"approved"
+status:"approved",
+slug: slug
 });
 
-alert("Post published successfully");
+alert("Post published successfully\nSlug: " + slug);
 loadPending();
 };
 
-/* REJECT POST */
+/* REJECT */
 window.reject = async function(id){
 
 const reason = document.getElementById(`reason-${id}`).value;
@@ -274,4 +282,4 @@ loadPending();
 </script>
 
 </body>
-  </html>
+</html>
