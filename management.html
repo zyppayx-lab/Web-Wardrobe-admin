@@ -36,8 +36,8 @@ font-weight:600;
 
 .approve{background:green;color:white;}
 .reject{background:red;color:white;}
-.edit{background:#111;color:white;}
 .view{background:#007bff;color:white;}
+.edit{background:#111;color:white;color:white;}
 
 input, textarea{
 width:100%;
@@ -56,7 +56,7 @@ color:#555;
 
 <body>
 
-<h2>Admin Review Panel</h2>
+<h2>Admin Management Panel</h2>
 <a href="dashboard.html">← Back</a>
 
 <div id="list">Loading...</div>
@@ -64,8 +64,10 @@ color:#555;
 <script type="module">
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+
 import {
-getAuth, onAuthStateChanged
+getAuth,
+onAuthStateChanged
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 
 import {
@@ -77,17 +79,17 @@ getDocs,
 doc,
 getDoc,
 updateDoc,
-setDoc,
-serverTimestamp
+setDoc
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
+/* FIREBASE CONFIG */
 const firebaseConfig = {
-apiKey:"AIzaSyBoSJggPoHfiI2quek_5m5gPSAhSaXFZE",
-authDomain:"web-wardrobe.firebaseapp.com",
-projectId:"web-wardrobe",
-storageBucket:"web-wardrobe.appspot.com",
-messagingSenderId:"201587857341",
-appId:"1:201587857341:web:044fe04f2503168881a4d4"
+apiKey: "AIzaSyBoSJggPoHfiI2quek_5mV5gPSAhSaXFZE",
+authDomain: "web-wardrobe.firebaseapp.com",
+projectId: "web-wardrobe",
+storageBucket: "web-wardrobe.appspot.com",
+messagingSenderId: "201587857341",
+appId: "1:201587857341:web:044fe04f2503168881a4d4"
 };
 
 const app = initializeApp(firebaseConfig);
@@ -96,22 +98,37 @@ const db = getFirestore(app);
 
 const ADMIN_EMAIL = "admin@webwardrobe.name.ng";
 
-onAuthStateChanged(auth, (user)=>{
+/* 🔥 FIX 1: SAFE AUTH HANDLING (NO AUTO FALSE REDIRECT) */
+function waitForAuth() {
+return new Promise((resolve) => {
+const unsub = onAuthStateChanged(auth, (user) => {
+unsub();
+resolve(user);
+});
+});
+}
 
-if(!user){
-location.href="login.html";
+/* START APP ONLY AFTER AUTH IS READY */
+(async () => {
+
+const user = await waitForAuth();
+
+if (!user) {
+location.href = "login.html";
 return;
 }
 
-if(user.email !== ADMIN_EMAIL){
+if (user.email !== ADMIN_EMAIL) {
 alert("Access denied");
-location.href="login.html";
+location.href = "login.html";
 return;
 }
 
 loadPending();
-});
 
+})();
+
+/* LOAD PENDING POSTS */
 async function loadPending(){
 
 const list = document.getElementById("list");
@@ -142,7 +159,7 @@ div.innerHTML = `
 
 <p class="small"><b>Category:</b> ${d.category}</p>
 <p class="small"><b>Email:</b> ${d.email}</p>
-<p class="small"><b>Promotion:</b> ${d.promotionType}</p>
+<p class="small"><b>Type:</b> ${d.promotionType}</p>
 
 <h4>Short Description</h4>
 <p>${d.shortDescription}</p>
@@ -154,7 +171,7 @@ div.innerHTML = `
 <img src="${d.media?.[0] || ''}">
 
 ${d.websiteUrl ? `
-<h4>Website Link</h4>
+<h4>Website</h4>
 <a href="${d.websiteUrl}" target="_blank">Open Link</a>
 ` : ""}
 
@@ -163,12 +180,12 @@ ${d.paymentProof ? `
 <img src="${d.paymentProof}">
 ` : ""}
 
-<h4>Reject Reason (optional)</h4>
-<input id="reason-${docSnap.id}" placeholder="Write reason if rejecting">
+<h4>Reject Reason</h4>
+<input id="reason-${docSnap.id}" placeholder="Optional reason">
 
 <br>
 
-<button class="view" onclick="openLink('${d.websiteUrl || ""}')">Check Website</button>
+<button class="view" onclick="openLink('${d.websiteUrl || ""}')">Check Link</button>
 <button class="approve" onclick="approve('${docSnap.id}')">Approve</button>
 <button class="reject" onclick="reject('${docSnap.id}')">Reject</button>
 
@@ -180,13 +197,13 @@ list.appendChild(div);
 
 }
 
-/* OPEN LINK SAFELY */
+/* SAFE LINK CHECK */
 window.openLink = function(url){
 if(!url){
-alert("No link provided");
+alert("No URL provided");
 return;
 }
-window.open(url,"_blank");
+window.open(url, "_blank");
 };
 
 /* APPROVE POST */
@@ -199,6 +216,7 @@ if(!snap.exists()) return;
 
 const d = snap.data();
 
+/* slug generator */
 function slugify(text){
 return text.toLowerCase()
 .trim()
@@ -209,6 +227,7 @@ return text.toLowerCase()
 
 const slug = slugify(d.title || "");
 
+/* publish to posts collection */
 await setDoc(doc(db,"posts",id),{
 title: d.title,
 slug,
@@ -229,11 +248,12 @@ createdAt: Date.now(),
 updatedAt: Date.now()
 });
 
+/* mark submission approved */
 await updateDoc(ref,{
 status:"approved"
 });
 
-alert("Approved & Published");
+alert("Post published successfully");
 loadPending();
 };
 
@@ -247,7 +267,7 @@ status:"rejected",
 rejectReason: reason || "No reason provided"
 });
 
-alert("Rejected");
+alert("Post rejected");
 loadPending();
 };
 
