@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-<title>Management | Web Wardrobe</title>
+<title>Web Wardrobe CMS</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
 <style>
@@ -9,6 +9,21 @@ body{
 font-family:Arial;
 background:#f5f5f5;
 padding:20px;
+}
+
+.topbar{
+display:flex;
+gap:10px;
+flex-wrap:wrap;
+margin-bottom:20px;
+}
+
+button{
+padding:10px;
+border:none;
+border-radius:6px;
+cursor:pointer;
+font-weight:600;
 }
 
 .card{
@@ -21,43 +36,37 @@ box-shadow:0 2px 10px rgba(0,0,0,.08);
 
 img{
 max-width:100%;
-margin-top:10px;
 border-radius:10px;
+margin-top:10px;
 }
 
-button{
-padding:10px;
-margin:5px;
-border:none;
-border-radius:6px;
-cursor:pointer;
-font-weight:600;
-}
-
-.approve{background:green;color:white;}
-.reject{background:red;color:white;}
-.view{background:#007bff;color:white;}
-.edit{background:#111;color:white;}
-
-input, textarea{
+input, textarea, select{
 width:100%;
 padding:10px;
-margin-top:5px;
+margin-top:6px;
 border-radius:8px;
 border:1px solid #ddd;
 }
 
-.small{
-font-size:13px;
-color:#555;
-}
+.small{font-size:13px;color:#666;}
+
+.approve{background:green;color:white;}
+.reject{background:red;color:white;}
+.edit{background:#111;color:white;}
+.view{background:#007bff;color:white;}
+.save{background:orange;color:white;}
 </style>
 </head>
 
 <body>
 
-<h2>Admin Management Panel</h2>
-<a href="dashboard.html">← Back</a>
+<h2>Web Wardrobe CMS Panel</h2>
+
+<div class="topbar">
+<button onclick="loadPosts('pending')">Pending</button>
+<button onclick="loadPosts('published')">Published</button>
+<button onclick="loadPosts('rejected')">Rejected</button>
+</div>
 
 <div id="list">Loading...</div>
 
@@ -77,9 +86,8 @@ updateDoc,
 setDoc
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
-/* FIREBASE */
 const firebaseConfig = {
-apiKey: "AIzaSyBoSJggPoHfiI2quek_5m5GPSAhSaXFZE",
+apiKey: "AIzaSyBoSJggPoHfiI2quek_5mV5gPSAhSaXFZE",
 authDomain: "web-wardrobe.firebaseapp.com",
 projectId: "web-wardrobe",
 storageBucket: "web-wardrobe.appspot.com",
@@ -93,62 +101,42 @@ const db = getFirestore(app);
 
 const ADMIN_EMAIL = "admin@webwardrobe.name.ng";
 
-/* SAFE AUTH */
-function waitForAuth(){
-return new Promise(resolve=>{
-onAuthStateChanged(auth,user=>{
-resolve(user);
-});
-});
-}
-
-/* INIT */
-(async () => {
-
-const user = await waitForAuth();
-
+/* AUTH FIX */
+onAuthStateChanged(auth,(user)=>{
 if(!user){
 location.href="login.html";
 return;
 }
-
 if(user.email !== ADMIN_EMAIL){
 alert("Access denied");
 location.href="login.html";
 return;
 }
+loadPosts("pending");
+});
 
-loadPending();
-
-})();
-
-/* =========================
-SLUG SYSTEM (AUTO GENERATOR)
-========================= */
-
+/* SLUG */
 function slugify(text){
-return text
-.toLowerCase()
+return text.toLowerCase()
 .trim()
 .replace(/[^a-z0-9\s-]/g,"")
 .replace(/\s+/g,"-")
 .replace(/-+/g,"-");
 }
 
-function generateSlug(title, id){
-const base = slugify(title || "post");
-const shortId = id.slice(0,5);
-return `${base}-${shortId}`;
+function generateSlug(title,id){
+return `${slugify(title)}-${id.slice(0,5)}`;
 }
 
 /* LOAD POSTS */
-async function loadPending(){
+window.loadPosts = async function(status){
 
 const list = document.getElementById("list");
+list.innerHTML = "Loading...";
 
 const q = query(
 collection(db,"businessSubmissions"),
-where("status","==","pending")
+where("status","==",status)
 );
 
 const snap = await getDocs(q);
@@ -156,70 +144,58 @@ const snap = await getDocs(q);
 list.innerHTML = "";
 
 if(snap.empty){
-list.innerHTML = "<p>No pending posts.</p>";
+list.innerHTML = "<p>No posts found.</p>";
 return;
 }
 
-snap.forEach(docSnap=>{
+snap.forEach(d=>{
 
-const d = docSnap.data();
+const data = d.data();
 
 const div = document.createElement("div");
 div.className = "card";
 
 div.innerHTML = `
-<h3>${d.title}</h3>
+<h3>${data.title}</h3>
 
-<p class="small"><b>Email:</b> ${d.email}</p>
-<p class="small"><b>Category:</b> ${d.category}</p>
-<p class="small"><b>Type:</b> ${d.promotionType}</p>
+<p class="small">Category: ${data.category}</p>
+<p class="small">Email: ${data.email}</p>
+<p class="small">Status: ${data.status}</p>
 
-<h4>Short Description</h4>
-<p>${d.shortDescription}</p>
+<input id="title-${d.id}" value="${data.title}">
+<input id="slug-${d.id}" value="${data.slug || ""}">
 
-<h4>Full Content</h4>
-<p>${d.longDescription}</p>
+<textarea id="short-${d.id}">${data.shortDescription || ""}</textarea>
+<textarea id="long-${d.id}">${data.longDescription || ""}</textarea>
 
-<h4>Image</h4>
-<img src="${d.media?.[0] || ''}">
+<img src="${data.media?.[0] || ""}">
 
-${d.websiteUrl ? `
-<h4>Website</h4>
-<a href="${d.websiteUrl}" target="_blank">Open Link</a>
-` : ""}
+<input id="website-${d.id}" value="${data.websiteUrl || ""}">
+<input id="affiliate-${d.id}" value="${data.affiliateLink || ""}">
 
-${d.paymentProof ? `
-<h4>Payment Proof</h4>
-<img src="${d.paymentProof}">
-` : ""}
+${data.paymentProof ? `<img src="${data.paymentProof}">` : ""}
 
-<h4>Reject Reason</h4>
-<input id="reason-${docSnap.id}" placeholder="Optional reason">
+<input id="reject-${d.id}" placeholder="Reject reason">
 
-<button class="view" onclick="openLink('${d.websiteUrl || ""}')">Check Link</button>
-<button class="approve" onclick="approve('${docSnap.id}')">Approve</button>
-<button class="reject" onclick="reject('${docSnap.id}')">Reject</button>
+<button class="view" onclick="openLink('${data.websiteUrl || ""}')">Check Link</button>
+<button class="approve" onclick="approve('${d.id}')">Approve</button>
+<button class="reject" onclick="reject('${d.id}')">Reject</button>
+<button class="edit" onclick="saveEdit('${d.id}')">Save Edit</button>
 `;
 
 list.appendChild(div);
 
 });
 
-}
+};
 
 /* OPEN LINK */
 window.openLink = function(url){
-if(!url){
-alert("No URL provided");
-return;
-}
+if(!url) return alert("No URL");
 window.open(url,"_blank");
 };
 
-/* =========================
-APPROVE POST (FIXED + SLUG)
-========================= */
-
+/* APPROVE */
 window.approve = async function(id){
 
 const ref = doc(db,"businessSubmissions",id);
@@ -229,54 +205,63 @@ if(!snap.exists()) return;
 
 const d = snap.data();
 
-/* AUTO SLUG */
-const slug = generateSlug(d.title, id);
+const slug = d.slug || generateSlug(d.title,id);
 
-/* PUBLISH TO POSTS */
+/* publish */
 await setDoc(doc(db,"posts",id),{
-title: d.title,
-slug: slug, // 🔥 CRITICAL FIX
-category: (d.category || "lifestyle").toLowerCase(),
-
-shortDescription: d.shortDescription,
-longDescription: d.longDescription,
-
-media: d.media || [],
-
-affiliateLink: d.affiliateLink || "",
-websiteUrl: d.websiteUrl || "",
-
-isSponsored: d.promotionType === "sponsored",
-
-status: "published",
-views: 0,
-
-createdAt: Date.now(),
-updatedAt: Date.now()
+title:d.title,
+slug,
+category:(d.category||"lifestyle").toLowerCase(),
+shortDescription:d.shortDescription,
+longDescription:d.longDescription,
+media:d.media||[],
+affiliateLink:d.affiliateLink||"",
+websiteUrl:d.websiteUrl||"",
+isSponsored:d.promotionType==="sponsored",
+status:"published",
+views:0,
+createdAt:Date.now()
 });
 
-/* UPDATE SUBMISSION */
 await updateDoc(ref,{
 status:"approved",
-slug: slug
+slug
 });
 
-alert("Post published successfully\nSlug: " + slug);
-loadPending();
+alert("Published with slug: "+slug);
+loadPosts("pending");
+};
+
+/* SAVE EDIT (NEW CMS POWER FEATURE) */
+window.saveEdit = async function(id){
+
+const ref = doc(db,"businessSubmissions",id);
+
+await updateDoc(ref,{
+title: document.getElementById(`title-${id}`).value,
+slug: document.getElementById(`slug-${id}`).value,
+shortDescription: document.getElementById(`short-${id}`).value,
+longDescription: document.getElementById(`long-${id}`).value,
+websiteUrl: document.getElementById(`website-${id}`).value,
+affiliateLink: document.getElementById(`affiliate-${id}`).value
+});
+
+alert("Changes saved");
+loadPosts("pending");
 };
 
 /* REJECT */
 window.reject = async function(id){
 
-const reason = document.getElementById(`reason-${id}`).value;
+const reason = document.getElementById(`reject-${id}`).value;
 
 await updateDoc(doc(db,"businessSubmissions",id),{
 status:"rejected",
-rejectReason: reason || "No reason provided"
+rejectReason:reason||"No reason"
 });
 
-alert("Post rejected");
-loadPending();
+alert("Rejected");
+loadPosts("pending");
 };
 
 </script>
