@@ -1,9 +1,8 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-<meta charset="UTF-8">
+<title>Management | Web Wardrobe</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Post Management | Web Wardrobe</title>
 
 <style>
 body{
@@ -15,15 +14,15 @@ padding:20px;
 .card{
 background:white;
 padding:15px;
-margin-bottom:20px;
+margin-bottom:15px;
 border-radius:12px;
 box-shadow:0 2px 10px rgba(0,0,0,.08);
 }
 
 img{
-max-width:250px;
-border-radius:10px;
+max-width:100%;
 margin-top:10px;
+border-radius:10px;
 }
 
 button{
@@ -32,46 +31,33 @@ margin:5px;
 border:none;
 border-radius:6px;
 cursor:pointer;
+font-weight:600;
 }
 
 .approve{background:green;color:white;}
 .reject{background:red;color:white;}
 .edit{background:#111;color:white;}
-.save{background:#007bff;color:white;}
+.view{background:#007bff;color:white;}
 
 input, textarea{
 width:100%;
 padding:10px;
 margin-top:5px;
-margin-bottom:10px;
 border-radius:8px;
 border:1px solid #ddd;
 }
 
-textarea{min-height:80px;}
-
-a{
-display:inline-block;
-margin-top:5px;
-color:#007bff;
-word-break:break-all;
-}
-
-.badge{
-display:inline-block;
-padding:4px 10px;
-border-radius:20px;
-font-size:12px;
-background:#eee;
-margin-bottom:8px;
+.small{
+font-size:13px;
+color:#555;
 }
 </style>
 </head>
 
 <body>
 
-<h2>Post Review Dashboard</h2>
-<p>Full moderation control panel</p>
+<h2>Admin Review Panel</h2>
+<a href="dashboard.html">← Back</a>
 
 <div id="list">Loading...</div>
 
@@ -79,23 +65,24 @@ margin-bottom:8px;
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import {
-getAuth,
-onAuthStateChanged
+getAuth, onAuthStateChanged
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 
 import {
 getFirestore,
 collection,
 query,
+where,
 getDocs,
 doc,
+getDoc,
 updateDoc,
-deleteDoc,
+setDoc,
 serverTimestamp
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
 const firebaseConfig = {
-apiKey:"AIzaSyBoSJggPoHfiI2quek_5mV5gPSAhSaXFZE",
+apiKey:"AIzaSyBoSJggPoHfiI2quek_5m5gPSAhSaXFZE",
 authDomain:"web-wardrobe.firebaseapp.com",
 projectId:"web-wardrobe",
 storageBucket:"web-wardrobe.appspot.com",
@@ -109,7 +96,8 @@ const db = getFirestore(app);
 
 const ADMIN_EMAIL = "admin@webwardrobe.name.ng";
 
-onAuthStateChanged(auth,(user)=>{
+onAuthStateChanged(auth, (user)=>{
+
 if(!user){
 location.href="login.html";
 return;
@@ -121,113 +109,149 @@ location.href="login.html";
 return;
 }
 
-loadPosts();
+loadPending();
 });
 
-async function loadPosts(){
+async function loadPending(){
 
 const list = document.getElementById("list");
-list.innerHTML = "Loading...";
 
-const snap = await getDocs(collection(db,"posts"));
+const q = query(
+collection(db,"businessSubmissions"),
+where("status","==","pending")
+);
+
+const snap = await getDocs(q);
 
 list.innerHTML = "";
 
+if(snap.empty){
+list.innerHTML = "<p>No pending posts.</p>";
+return;
+}
+
 snap.forEach(docSnap=>{
-const data = docSnap.data();
+
+const d = docSnap.data();
 
 const div = document.createElement("div");
 div.className = "card";
 
 div.innerHTML = `
-<div class="badge">Status: ${data.status || "unknown"}</div>
+<h3>${d.title}</h3>
 
-<h3 contenteditable="true" id="title-${docSnap.id}">${data.title || ""}</h3>
+<p class="small"><b>Category:</b> ${d.category}</p>
+<p class="small"><b>Email:</b> ${d.email}</p>
+<p class="small"><b>Promotion:</b> ${d.promotionType}</p>
 
-<p><b>Category:</b> ${data.category || ""}</p>
+<h4>Short Description</h4>
+<p>${d.shortDescription}</p>
 
-<p><b>Slug:</b> ${data.slug || "❌ missing"}</p>
+<h4>Full Content</h4>
+<p>${d.longDescription}</p>
 
-<img src="${data.media?.[0] || ''}">
+<h4>Image</h4>
+<img src="${d.media?.[0] || ''}">
 
-<p><b>Short Description:</b></p>
-<textarea id="short-${docSnap.id}">${data.shortDescription || ""}</textarea>
-
-<p><b>Full Content:</b></p>
-<textarea id="long-${docSnap.id}">${data.longDescription || ""}</textarea>
-
-<p><b>Affiliate Link:</b></p>
-<a href="${data.affiliateLink || '#'}" target="_blank">${data.affiliateLink || "none"}</a>
-
-<p><b>Website Link:</b></p>
-<a href="${data.websiteUrl || '#'}" target="_blank">${data.websiteUrl || "none"}</a>
-
-${data.paymentProof ? `
-<p><b>Payment Proof:</b></p>
-<img src="${data.paymentProof}">
+${d.websiteUrl ? `
+<h4>Website Link</h4>
+<a href="${d.websiteUrl}" target="_blank">Open Link</a>
 ` : ""}
 
-${data.rejectionReason ? `
-<p style="color:red;"><b>Rejection Reason:</b> ${data.rejectionReason}</p>
+${d.paymentProof ? `
+<h4>Payment Proof</h4>
+<img src="${d.paymentProof}">
 ` : ""}
 
-<div>
+<h4>Reject Reason (optional)</h4>
+<input id="reason-${docSnap.id}" placeholder="Write reason if rejecting">
 
+<br>
+
+<button class="view" onclick="openLink('${d.websiteUrl || ""}')">Check Website</button>
 <button class="approve" onclick="approve('${docSnap.id}')">Approve</button>
-
 <button class="reject" onclick="reject('${docSnap.id}')">Reject</button>
 
-<button class="edit" onclick="saveEdit('${docSnap.id}')">Save Edits</button>
-
-</div>
 `;
 
 list.appendChild(div);
+
 });
+
 }
 
-window.saveEdit = async function(id){
-
-const title = document.getElementById(`title-${id}`).innerText;
-const short = document.getElementById(`short-${id}`).value;
-const long = document.getElementById(`long-${id}`).value;
-
-await updateDoc(doc(db,"posts",id),{
-title,
-shortDescription: short,
-longDescription: long,
-updatedAt: serverTimestamp()
-});
-
-alert("Post updated");
-loadPosts();
+/* OPEN LINK SAFELY */
+window.openLink = function(url){
+if(!url){
+alert("No link provided");
+return;
+}
+window.open(url,"_blank");
 };
 
+/* APPROVE POST */
 window.approve = async function(id){
 
-await updateDoc(doc(db,"posts",id),{
-status:"published",
-rejectionReason:""
+const ref = doc(db,"businessSubmissions",id);
+const snap = await getDoc(ref);
+
+if(!snap.exists()) return;
+
+const d = snap.data();
+
+function slugify(text){
+return text.toLowerCase()
+.trim()
+.replace(/[^a-z0-9\s-]/g,"")
+.replace(/\s+/g,"-")
+.replace(/-+/g,"-");
+}
+
+const slug = slugify(d.title || "");
+
+await setDoc(doc(db,"posts",id),{
+title: d.title,
+slug,
+category: (d.category || "lifestyle").toLowerCase(),
+shortDescription: d.shortDescription,
+longDescription: d.longDescription,
+media: d.media || [],
+
+affiliateLink: d.affiliateLink || "",
+websiteUrl: d.websiteUrl || "",
+
+isSponsored: d.promotionType === "sponsored",
+
+status: "published",
+views: 0,
+
+createdAt: Date.now(),
+updatedAt: Date.now()
 });
 
-alert("Approved");
-loadPosts();
+await updateDoc(ref,{
+status:"approved"
+});
+
+alert("Approved & Published");
+loadPending();
 };
 
+/* REJECT POST */
 window.reject = async function(id){
 
-const reason = prompt("Enter rejection reason:");
+const reason = document.getElementById(`reason-${id}`).value;
 
-await updateDoc(doc(db,"posts",id),{
+await updateDoc(doc(db,"businessSubmissions",id),{
 status:"rejected",
-rejectionReason: reason || "No reason provided"
+rejectReason: reason || "No reason provided"
 });
 
 alert("Rejected");
-loadPosts();
+loadPending();
 };
 
 </script>
 
 </body>
-</html>
+  </html>
