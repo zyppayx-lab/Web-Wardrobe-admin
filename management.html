@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-<title>Web Wardrobe CMS (Fixed)</title>
+<title>Web Wardrobe CMS (Stable Build)</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
 <style>
@@ -55,10 +55,8 @@ border:1px solid #ddd;
 
 .approve{background:green;color:white;}
 .reject{background:red;color:white;}
-.edit{background:#111;color:white;}
-.view{background:#007bff;color:white;}
-.analytics{background:purple;color:white;}
 .save{background:orange;color:white;}
+.view{background:#007bff;color:white;}
 </style>
 </head>
 
@@ -72,7 +70,7 @@ border:1px solid #ddd;
 <button onclick="loadPosts('rejected')">Rejected</button>
 </div>
 
-<div id="list">Loading...</div>
+<div id="list">Loading admin panel...</div>
 
 <script type="module">
 
@@ -87,11 +85,10 @@ getDocs,
 doc,
 getDoc,
 updateDoc,
-setDoc,
-increment
+setDoc
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
-/* CONFIG */
+/* FIREBASE CONFIG */
 const firebaseConfig = {
 apiKey: "YOUR_REAL_API_KEY",
 authDomain: "web-wardrobe.firebaseapp.com",
@@ -107,24 +104,44 @@ const db = getFirestore(app);
 
 const ADMIN_EMAIL = "admin@webwardrobe.name.ng";
 
-/* AUTH FIX (NO LOOP) */
-onAuthStateChanged(auth, (user) => {
-if(!user){
+/* 🔥 FIX: SAFE AUTH (NO RANDOM LOGOUT) */
+function waitAuth() {
+return new Promise((resolve) => {
+const unsub = onAuthStateChanged(auth, (user) => {
+unsub();
+resolve(user);
+});
+});
+}
+
+/* START APP */
+(async function () {
+
+document.getElementById("list").innerHTML = "Checking admin session...";
+
+const user = await waitAuth();
+
+if (!user) {
 location.href = "login.html";
 return;
 }
-if(user.email !== ADMIN_EMAIL){
+
+const email = (user.email || "").toLowerCase().trim();
+const admin = ADMIN_EMAIL.toLowerCase().trim();
+
+if (email !== admin) {
 alert("Access denied");
 location.href = "login.html";
 return;
 }
 
 loadPosts("pending");
-});
 
-/* SLUG SYSTEM */
+})();
+
+/* SLUG */
 function slugify(text){
-return text
+return (text || "")
 .toLowerCase()
 .trim()
 .replace(/[^a-z0-9\s-]/g,"")
@@ -137,7 +154,7 @@ function makeSlug(title, id){
 return `${slugify(title)}-${id.slice(0,6)}`;
 }
 
-/* LOAD POSTS (FIXED LOGIC) */
+/* LOAD POSTS */
 window.loadPosts = async function(status){
 
 const list = document.getElementById("list");
@@ -165,10 +182,10 @@ const div = document.createElement("div");
 div.className = "card";
 
 div.innerHTML = `
-<h3>${d.title}</h3>
+<h3>${d.title || ""}</h3>
 
 <p class="small">Slug: ${d.slug || "none"}</p>
-<p class="small">Category: ${d.category}</p>
+<p class="small">Category: ${d.category || ""}</p>
 <p class="small">Views: ${d.views || 0}</p>
 
 <img src="${d.media?.[0] || ""}">
@@ -193,7 +210,6 @@ div.innerHTML = `
 
 <div style="margin-top:10px;">
 <button class="view" onclick="openLink('${d.websiteUrl || ""}')">Open Link</button>
-<button class="analytics" onclick="showAnalytics('${docSnap.id}')">Analytics</button>
 <button class="save" onclick="savePost('${docSnap.id}')">Save</button>
 <button class="approve" onclick="publish('${docSnap.id}')">Publish</button>
 <button class="reject" onclick="reject('${docSnap.id}')">Reject</button>
@@ -224,10 +240,10 @@ affiliateLink: document.getElementById(`aff-${id}`).value,
 updatedAt: Date.now()
 });
 
-alert("Saved");
+alert("Saved successfully");
 };
 
-/* PUBLISH (APPROVE) */
+/* PUBLISH */
 window.publish = async function(id){
 
 const ref = doc(db,"posts",id);
@@ -245,7 +261,7 @@ slug,
 publishedAt: Date.now()
 });
 
-alert("Published successfully");
+alert("Published");
 loadPosts("pending");
 };
 
@@ -258,20 +274,6 @@ status:"rejected"
 
 alert("Rejected");
 loadPosts("pending");
-};
-
-/* ANALYTICS */
-window.showAnalytics = async function(id){
-
-const snap = await getDoc(doc(db,"posts",id));
-
-if(!snap.exists()) return;
-
-const d = snap.data();
-
-alert(
-`TITLE: ${d.title}\nVIEWS: ${d.views || 0}\nSTATUS: ${d.status}`
-);
 };
 
 </script>
