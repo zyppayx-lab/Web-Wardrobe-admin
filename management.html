@@ -1,7 +1,11 @@
-<!DOCTYPE html><html>
+<!DOCTYPE html>
+<html lang="en">
 <head>
-<title>Management</title>
-<meta name="viewport" content="width=device-width, initial-scale=1.0"><style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Post Management | Web Wardrobe</title>
+
+<style>
 body{
 font-family:Arial;
 background:#f5f5f5;
@@ -11,15 +15,15 @@ padding:20px;
 .card{
 background:white;
 padding:15px;
-margin-bottom:15px;
+margin-bottom:20px;
 border-radius:12px;
 box-shadow:0 2px 10px rgba(0,0,0,.08);
 }
 
 img{
-max-width:300px;
-margin-top:10px;
+max-width:250px;
 border-radius:10px;
+margin-top:10px;
 }
 
 button{
@@ -30,47 +34,65 @@ border-radius:6px;
 cursor:pointer;
 }
 
-.approve{
-background:green;
-color:white;
+.approve{background:green;color:white;}
+.reject{background:red;color:white;}
+.edit{background:#111;color:white;}
+.save{background:#007bff;color:white;}
+
+input, textarea{
+width:100%;
+padding:10px;
+margin-top:5px;
+margin-bottom:10px;
+border-radius:8px;
+border:1px solid #ddd;
 }
 
-.reject{
-background:red;
-color:white;
-}
+textarea{min-height:80px;}
 
 a{
 display:inline-block;
-margin-bottom:20px;
+margin-top:5px;
+color:#007bff;
+word-break:break-all;
 }
-</style></head>
-<body><h2>Pending Business Submissions</h2><a href="dashboard.html">← Back to Dashboard</a>
 
-<div id="list">Loading...</div><script type="module">
+.badge{
+display:inline-block;
+padding:4px 10px;
+border-radius:20px;
+font-size:12px;
+background:#eee;
+margin-bottom:8px;
+}
+</style>
+</head>
 
-import { initializeApp }
-from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+<body>
 
+<h2>Post Review Dashboard</h2>
+<p>Full moderation control panel</p>
+
+<div id="list">Loading...</div>
+
+<script type="module">
+
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import {
 getAuth,
 onAuthStateChanged
-}
-from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+} from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 
 import {
 getFirestore,
 collection,
 query,
-where,
 getDocs,
 doc,
-getDoc,
-setDoc,
 updateDoc,
+deleteDoc,
 serverTimestamp
-}
-from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+} from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
 const firebaseConfig = {
 apiKey:"AIzaSyBoSJggPoHfiI2quek_5mV5gPSAhSaXFZE",
@@ -88,7 +110,6 @@ const db = getFirestore(app);
 const ADMIN_EMAIL = "admin@webwardrobe.name.ng";
 
 onAuthStateChanged(auth,(user)=>{
-
 if(!user){
 location.href="login.html";
 return;
@@ -100,139 +121,113 @@ location.href="login.html";
 return;
 }
 
-loadPending();
-
+loadPosts();
 });
 
-async function loadPending(){
+async function loadPosts(){
 
 const list = document.getElementById("list");
+list.innerHTML = "Loading...";
 
-const q = query(
-collection(db,"businessSubmissions"),
-where("status","==","pending")
-);
-
-const snap = await getDocs(q);
+const snap = await getDocs(collection(db,"posts"));
 
 list.innerHTML = "";
 
-if(snap.empty){
-list.innerHTML = "<p>No pending submissions.</p>";
-return;
-}
-
 snap.forEach(docSnap=>{
-
 const data = docSnap.data();
 
 const div = document.createElement("div");
-
 div.className = "card";
 
 div.innerHTML = `
-<h3>${data.title || ""}</h3>
+<div class="badge">Status: ${data.status || "unknown"}</div>
 
-<p><b>Email:</b> ${data.email || ""}</p>
+<h3 contenteditable="true" id="title-${docSnap.id}">${data.title || ""}</h3>
 
 <p><b>Category:</b> ${data.category || ""}</p>
 
-<p><b>Promotion:</b> ${data.promotionType || "affiliate"}</p>
+<p><b>Slug:</b> ${data.slug || "❌ missing"}</p>
 
-<p><b>Status:</b> ${data.status}</p>
+<img src="${data.media?.[0] || ''}">
 
-<p>${data.shortDescription || ""}</p>
+<p><b>Short Description:</b></p>
+<textarea id="short-${docSnap.id}">${data.shortDescription || ""}</textarea>
+
+<p><b>Full Content:</b></p>
+<textarea id="long-${docSnap.id}">${data.longDescription || ""}</textarea>
+
+<p><b>Affiliate Link:</b></p>
+<a href="${data.affiliateLink || '#'}" target="_blank">${data.affiliateLink || "none"}</a>
+
+<p><b>Website Link:</b></p>
+<a href="${data.websiteUrl || '#'}" target="_blank">${data.websiteUrl || "none"}</a>
 
 ${data.paymentProof ? `
-<h4>Payment Screenshot</h4>
+<p><b>Payment Proof:</b></p>
 <img src="${data.paymentProof}">
-` : `
-<p>No payment screenshot uploaded.</p>
-`}
+` : ""}
 
-<br>
+${data.rejectionReason ? `
+<p style="color:red;"><b>Rejection Reason:</b> ${data.rejectionReason}</p>
+` : ""}
 
-<button
-class="approve"
-onclick="approveSubmission('${docSnap.id}')">
-Approve
-</button>
+<div>
 
-<button
-class="reject"
-onclick="rejectSubmission('${docSnap.id}')">
-Reject
-</button>
+<button class="approve" onclick="approve('${docSnap.id}')">Approve</button>
+
+<button class="reject" onclick="reject('${docSnap.id}')">Reject</button>
+
+<button class="edit" onclick="saveEdit('${docSnap.id}')">Save Edits</button>
+
+</div>
 `;
 
 list.appendChild(div);
+});
+}
 
+window.saveEdit = async function(id){
+
+const title = document.getElementById(`title-${id}`).innerText;
+const short = document.getElementById(`short-${id}`).value;
+const long = document.getElementById(`long-${id}`).value;
+
+await updateDoc(doc(db,"posts",id),{
+title,
+shortDescription: short,
+longDescription: long,
+updatedAt: serverTimestamp()
 });
 
-}
+alert("Post updated");
+loadPosts();
+};
 
-window.approveSubmission = async function(id){
+window.approve = async function(id){
 
-const ref = doc(db,"businessSubmissions",id);
-
-const snap = await getDoc(ref);
-
-if(!snap.exists()){
-alert("Submission not found");
-return;
-}
-
-const data = snap.data();
-
-if(
-data.promotionType === "sponsored"
-&& !data.paymentProof
-){
-alert("Sponsored post requires payment screenshot.");
-return;
-}
-
-await setDoc(
-doc(db,"posts",id),
-{
-title:data.title,
-category:data.category.toLowerCase(),
-shortDescription:data.shortDescription,
-longDescription:data.longDescription,
-media:data.media || [],
-affiliateLink:data.affiliateLink || "",
-websiteUrl:data.websiteUrl || "",
-isSponsored:data.promotionType==="sponsored",
-views:0,
+await updateDoc(doc(db,"posts",id),{
 status:"published",
-createdAt:serverTimestamp()
-}
-);
-
-await updateDoc(ref,{
-status:"approved"
+rejectionReason:""
 });
 
-alert("Post approved and published");
-
-loadPending();
-
+alert("Approved");
+loadPosts();
 };
 
-window.rejectSubmission = async function(id){
+window.reject = async function(id){
 
-await updateDoc(
-doc(db,"businessSubmissions",id),
-{
-status:"rejected"
-}
-);
+const reason = prompt("Enter rejection reason:");
 
-alert("Post rejected");
+await updateDoc(doc(db,"posts",id),{
+status:"rejected",
+rejectionReason: reason || "No reason provided"
+});
 
-loadPending();
-
+alert("Rejected");
+loadPosts();
 };
 
-</script></body>
+</script>
+
+</body>
 </html>
