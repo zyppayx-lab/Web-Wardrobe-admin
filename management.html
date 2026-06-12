@@ -19,9 +19,9 @@ margin-bottom:20px;
 }
 
 button{
-padding:10px;
+padding:10px 14px;
 border:none;
-border-radius:6px;
+border-radius:8px;
 cursor:pointer;
 font-weight:600;
 }
@@ -40,7 +40,7 @@ border-radius:10px;
 margin-top:10px;
 }
 
-input, textarea, select{
+input, textarea{
 width:100%;
 padding:10px;
 margin-top:6px;
@@ -55,6 +55,7 @@ border:1px solid #ddd;
 .edit{background:#111;color:white;}
 .view{background:#007bff;color:white;}
 .save{background:orange;color:white;}
+.tab-active{background:#111;color:white;}
 </style>
 </head>
 
@@ -63,9 +64,9 @@ border:1px solid #ddd;
 <h2>Web Wardrobe CMS Panel</h2>
 
 <div class="topbar">
-<button onclick="loadPosts('pending')">Pending</button>
-<button onclick="loadPosts('published')">Published</button>
-<button onclick="loadPosts('rejected')">Rejected</button>
+<button onclick="loadTab('pending')">Pending</button>
+<button onclick="loadTab('published')">Published</button>
+<button onclick="loadTab('rejected')">Rejected</button>
 </div>
 
 <div id="list">Loading...</div>
@@ -87,7 +88,7 @@ setDoc
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
 const firebaseConfig = {
-apiKey: "AIzaSyBoSJggPoHfiI2quek_5mV5gPSAhSaXFZE",
+apiKey: "AIzaSyBoSJggPoHfiI2quek_5m5GPSAhSaXFZE",
 authDomain: "web-wardrobe.firebaseapp.com",
 projectId: "web-wardrobe",
 storageBucket: "web-wardrobe.appspot.com",
@@ -101,18 +102,13 @@ const db = getFirestore(app);
 
 const ADMIN_EMAIL = "admin@webwardrobe.name.ng";
 
-/* AUTH FIX */
+/* AUTH */
 onAuthStateChanged(auth,(user)=>{
-if(!user){
+if(!user || user.email !== ADMIN_EMAIL){
 location.href="login.html";
 return;
 }
-if(user.email !== ADMIN_EMAIL){
-alert("Access denied");
-location.href="login.html";
-return;
-}
-loadPosts("pending");
+loadTab("pending");
 });
 
 /* SLUG */
@@ -124,33 +120,37 @@ return text.toLowerCase()
 .replace(/-+/g,"-");
 }
 
-function generateSlug(title,id){
-return `${slugify(title)}-${id.slice(0,5)}`;
+function makeSlug(title,id){
+return `${slugify(title)}-${id.slice(0,6)}`;
 }
 
-/* LOAD POSTS */
-window.loadPosts = async function(status){
+/* TAB SYSTEM */
+window.loadTab = async function(tab){
 
 const list = document.getElementById("list");
 list.innerHTML = "Loading...";
 
-const q = query(
-collection(db,"businessSubmissions"),
-where("status","==",status)
-);
+let snap;
 
-const snap = await getDocs(q);
+if(tab === "published"){
+snap = await getDocs(collection(db,"posts"));
+} else {
+snap = await getDocs(
+query(collection(db,"businessSubmissions"), where("status","==",tab))
+);
+}
 
 list.innerHTML = "";
 
 if(snap.empty){
-list.innerHTML = "<p>No posts found.</p>";
+list.innerHTML = "<p>No data found.</p>";
 return;
 }
 
 snap.forEach(d=>{
 
 const data = d.data();
+const isPublished = tab === "published";
 
 const div = document.createElement("div");
 div.className = "card";
@@ -158,29 +158,31 @@ div.className = "card";
 div.innerHTML = `
 <h3>${data.title}</h3>
 
-<p class="small">Category: ${data.category}</p>
-<p class="small">Email: ${data.email}</p>
-<p class="small">Status: ${data.status}</p>
+<p class="small">Category: ${data.category || ""}</p>
+<p class="small">Status: ${data.status || (isPublished ? "published" : "")}</p>
 
-<input id="title-${d.id}" value="${data.title}">
-<input id="slug-${d.id}" value="${data.slug || ""}">
+${data.slug ? `<p class="small"><b>Slug:</b> ${data.slug}</p>` : ""}
 
-<textarea id="short-${d.id}">${data.shortDescription || ""}</textarea>
-<textarea id="long-${d.id}">${data.longDescription || ""}</textarea>
+<h4>Short</h4>
+<p>${data.shortDescription || ""}</p>
 
-<img src="${data.media?.[0] || ""}">
+<h4>Full</h4>
+<p>${data.longDescription || ""}</p>
 
-<input id="website-${d.id}" value="${data.websiteUrl || ""}">
-<input id="affiliate-${d.id}" value="${data.affiliateLink || ""}">
+${data.media?.[0] ? `<img src="${data.media[0]}">` : ""}
 
-${data.paymentProof ? `<img src="${data.paymentProof}">` : ""}
+${data.websiteUrl ? `<a href="${data.websiteUrl}" target="_blank">Open Link</a>` : ""}
 
+${!isPublished ? `
 <input id="reject-${d.id}" placeholder="Reject reason">
 
-<button class="view" onclick="openLink('${data.websiteUrl || ""}')">Check Link</button>
-<button class="approve" onclick="approve('${d.id}')">Approve</button>
-<button class="reject" onclick="reject('${d.id}')">Reject</button>
-<button class="edit" onclick="saveEdit('${d.id}')">Save Edit</button>
+<button class="view" onclick="window.open('${data.websiteUrl || ""}','_blank')">Check</button>
+<button class="approve" onclick="approvePost('${d.id}')">Approve</button>
+<button class="reject" onclick="rejectPost('${d.id}')">Reject</button>
+<button class="edit" onclick="editPost('${d.id}')">Edit</button>
+` : `
+<button class="view" onclick="window.open('${data.websiteUrl || ""}','_blank')">View Live</button>
+`}
 `;
 
 list.appendChild(div);
@@ -189,14 +191,8 @@ list.appendChild(div);
 
 };
 
-/* OPEN LINK */
-window.openLink = function(url){
-if(!url) return alert("No URL");
-window.open(url,"_blank");
-};
-
 /* APPROVE */
-window.approve = async function(id){
+window.approvePost = async function(id){
 
 const ref = doc(db,"businessSubmissions",id);
 const snap = await getDoc(ref);
@@ -205,9 +201,8 @@ if(!snap.exists()) return;
 
 const d = snap.data();
 
-const slug = d.slug || generateSlug(d.title,id);
+const slug = d.slug || makeSlug(d.title,id);
 
-/* publish */
 await setDoc(doc(db,"posts",id),{
 title:d.title,
 slug,
@@ -215,9 +210,8 @@ category:(d.category||"lifestyle").toLowerCase(),
 shortDescription:d.shortDescription,
 longDescription:d.longDescription,
 media:d.media||[],
-affiliateLink:d.affiliateLink||"",
 websiteUrl:d.websiteUrl||"",
-isSponsored:d.promotionType==="sponsored",
+affiliateLink:d.affiliateLink||"",
 status:"published",
 views:0,
 createdAt:Date.now()
@@ -228,40 +222,42 @@ status:"approved",
 slug
 });
 
-alert("Published with slug: "+slug);
-loadPosts("pending");
-};
-
-/* SAVE EDIT (NEW CMS POWER FEATURE) */
-window.saveEdit = async function(id){
-
-const ref = doc(db,"businessSubmissions",id);
-
-await updateDoc(ref,{
-title: document.getElementById(`title-${id}`).value,
-slug: document.getElementById(`slug-${id}`).value,
-shortDescription: document.getElementById(`short-${id}`).value,
-longDescription: document.getElementById(`long-${id}`).value,
-websiteUrl: document.getElementById(`website-${id}`).value,
-affiliateLink: document.getElementById(`affiliate-${id}`).value
-});
-
-alert("Changes saved");
-loadPosts("pending");
+alert("Published");
+loadTab("pending");
 };
 
 /* REJECT */
-window.reject = async function(id){
+window.rejectPost = async function(id){
 
 const reason = document.getElementById(`reject-${id}`).value;
 
 await updateDoc(doc(db,"businessSubmissions",id),{
 status:"rejected",
-rejectReason:reason||"No reason"
+rejectReason:reason || "No reason"
 });
 
-alert("Rejected");
-loadPosts("pending");
+loadTab("pending");
+};
+
+/* EDIT (simple inline save) */
+window.editPost = async function(id){
+
+const ref = doc(db,"businessSubmissions",id);
+const snap = await getDoc(ref);
+
+if(!snap.exists()) return;
+
+const d = snap.data();
+
+const newTitle = prompt("Edit title", d.title);
+if(!newTitle) return;
+
+await updateDoc(ref,{
+title:newTitle
+});
+
+alert("Updated");
+loadTab("pending");
 };
 
 </script>
