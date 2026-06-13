@@ -577,6 +577,38 @@ serverTimestamp()
 }
 );
 
+/* SEND NEWSLETTER */
+
+try {
+
+await fetch(
+"https://email-sender.ikechukwufavour220.workers.dev",
+{
+method: "POST",
+headers: {
+"Content-Type": "application/json"
+},
+body: JSON.stringify({
+title: document.getElementById("title-${id}").value,
+slug,
+category: (d.category || "").toLowerCase(),
+shortDescription: document.getElementById("short-${id}").value,
+longDescription: document.getElementById("long-${id}").value,
+media: d.media || [],
+affiliateLink: document.getElementById("affiliate-${id}").value
+})
+}
+);
+
+} catch(err) {
+
+console.error(
+"Newsletter failed",
+err
+);
+
+}
+
 /* Mark approved */
 
 await updateDoc(ref,{
@@ -592,8 +624,9 @@ alert(
 );
 
 loadPending();
-
+   
 };
+
 
 /* ==========================
    REJECT
