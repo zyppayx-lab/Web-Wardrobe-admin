@@ -1,24 +1,118 @@
 <!DOCTYPE html>
 <html>
 <head>
-<title>Web Wardrobe CMS (Stable Build)</title>
+<meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
+<title>Web Wardrobe CMS</title>
+
 <style>
+
+*{
+margin:0;
+padding:0;
+box-sizing:border-box;
+}
+
 body{
-font-family:Arial;
-background:#f4f6f8;
+font-family:Inter,Arial,sans-serif;
+background:#f5f7fa;
 padding:20px;
 color:#111;
 }
 
-h2{margin-bottom:10px;}
+h1{
+margin-bottom:20px;
+}
 
-.topbar{
+.tabs{
+display:flex;
+gap:10px;
+margin-bottom:20px;
+flex-wrap:wrap;
+}
+
+.tabs button{
+background:#111;
+color:white;
+padding:12px 18px;
+border:none;
+border-radius:8px;
+cursor:pointer;
+font-weight:600;
+}
+
+.card{
+background:white;
+padding:20px;
+margin-bottom:20px;
+border-radius:14px;
+box-shadow:0 3px 12px rgba(0,0,0,.08);
+}
+
+.card img{
+width:100%;
+max-height:350px;
+object-fit:cover;
+border-radius:10px;
+margin-top:10px;
+}
+
+label{
+display:block;
+margin-top:10px;
+font-weight:600;
+}
+
+input,
+textarea,
+select{
+width:100%;
+padding:10px;
+margin-top:5px;
+border:1px solid #ddd;
+border-radius:8px;
+}
+
+textarea{
+min-height:140px;
+}
+
+.actions{
+margin-top:15px;
 display:flex;
 gap:10px;
 flex-wrap:wrap;
-margin-bottom:20px;
+}
+
+.approve{
+background:green;
+color:white;
+}
+
+.reject{
+background:red;
+color:white;
+}
+
+.save{
+background:#ff9800;
+color:white;
+}
+
+.restore{
+background:#2196f3;
+color:white;
+}
+
+.visit{
+background:#111;
+color:white;
+}
+
+.analytics{
+background:purple;
+color:white;
 }
 
 button{
@@ -29,139 +123,139 @@ cursor:pointer;
 font-weight:600;
 }
 
-.card{
-background:white;
-padding:15px;
-margin-bottom:15px;
-border-radius:12px;
-box-shadow:0 2px 10px rgba(0,0,0,.08);
+.small{
+font-size:13px;
+color:#666;
+margin-top:5px;
 }
 
-img{
-max-width:100%;
-border-radius:10px;
-margin-top:10px;
-}
-
-input, textarea{
-width:100%;
-padding:10px;
-margin-top:6px;
-border-radius:8px;
-border:1px solid #ddd;
-}
-
-.small{font-size:13px;color:#666;}
-
-.approve{background:green;color:white;}
-.reject{background:red;color:white;}
-.save{background:orange;color:white;}
-.view{background:#007bff;color:white;}
 </style>
 </head>
 
 <body>
 
-<h2>Web Wardrobe CMS</h2>
+<h1>Web Wardrobe CMS</h1>
 
-<div class="topbar">
-<button onclick="loadPosts('pending')">Pending</button>
-<button onclick="loadPosts('published')">Published</button>
-<button onclick="loadPosts('rejected')">Rejected</button>
+<div class="tabs">
+
+<button onclick="loadPending()">
+Pending
+</button>
+
+<button onclick="loadApproved()">
+Approved
+</button>
+
+<button onclick="loadRejected()">
+Rejected
+</button>
+
 </div>
 
-<div id="list">Loading admin panel...</div>
+<div id="list">
+Loading CMS...
+</div>
 
 <script type="module">
 
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+import { initializeApp }
+from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+
+import {
+getAuth,
+onAuthStateChanged
+}
+from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+
 import {
 getFirestore,
 collection,
 query,
 where,
 getDocs,
-doc,
 getDoc,
+doc,
+setDoc,
 updateDoc,
-setDoc
-} from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+deleteDoc,
+serverTimestamp
+}
+from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
-/* FIREBASE CONFIG */
 const firebaseConfig = {
-apiKey: "AIzaSyBoSJggPoHfiI2quek_5mV5gPSAhSaXFZE",
-projectId: "web-wardrobe",
-storageBucket: "web-wardrobe.appspot.com",
-messagingSenderId: "201587857341",
-appId: "1:201587857341:web:044fe04f2503168881a4d4"
+
+apiKey:"AIzaSyBoSJggPoHfiI2quek_5mV5gPSAhSaXFZE",
+
+authDomain:"web-wardrobe.firebaseapp.com",
+
+projectId:"web-wardrobe",
+
+storageBucket:"web-wardrobe.appspot.com",
+
+messagingSenderId:"201587857341",
+
+appId:"1:201587857341:web:044fe04f2503168881a4d4"
+
 };
 
 const app = initializeApp(firebaseConfig);
+
 const auth = getAuth(app);
+
 const db = getFirestore(app);
 
-const ADMIN_EMAIL = "admin@webwardrobe.name.ng";
+const ADMIN_EMAIL =
+"admin@webwardrobe.name.ng";
 
-/* 🔥 FIX: SAFE AUTH (NO RANDOM LOGOUT) */
-function waitAuth() {
-return new Promise((resolve) => {
-const unsub = onAuthStateChanged(auth, (user) => {
-unsub();
-resolve(user);
-});
-});
+function slugify(text){
+
+return text
+.toLowerCase()
+.trim()
+.replace(/[^a-z0-9\s-]/g,"")
+.replace(/\s+/g,"-")
+.replace(/-+/g,"-");
+
 }
 
-/* START APP */
-(async function () {
+function safe(v){
+return v || "";
+}
 
-document.getElementById("list").innerHTML = "Checking admin session...";
+auth.authStateReady().then(() => {
 
-const user = await waitAuth();
+const user = auth.currentUser;
 
-if (!user) {
+if(!user){
 location.href = "login.html";
 return;
 }
 
-const email = (user.email || "").toLowerCase().trim();
-const admin = ADMIN_EMAIL.toLowerCase().trim();
-
-if (email !== admin) {
+if(
+user.email.toLowerCase() !==
+ADMIN_EMAIL.toLowerCase()
+){
 alert("Access denied");
 location.href = "login.html";
 return;
 }
 
-loadPosts("pending");
+loadPending();
 
-})();
+});
+/* ==========================
+   PENDING POSTS
+========================== */
 
-/* SLUG */
-function slugify(text){
-return (text || "")
-.toLowerCase()
-.trim()
-.replace(/[^a-z0-9\s-]/g,"")
-.replace(/\s+/g,"-")
-.replace(/-+/g,"-")
-.substring(0,80);
-}
-
-function makeSlug(title, id){
-return `${slugify(title)}-${id.slice(0,6)}`;
-}
-
-/* LOAD POSTS */
-window.loadPosts = async function(status){
+window.loadPending = async function(){
 
 const list = document.getElementById("list");
-list.innerHTML = "Loading...";
+
+list.innerHTML = "Loading pending submissions...";
 
 const q = query(
-collection(db,"posts"),
-where("status","==",status)
+collection(db,"businessSubmissions"),
+where("status","==","pending")
 );
 
 const snap = await getDocs(q);
@@ -169,110 +263,937 @@ const snap = await getDocs(q);
 list.innerHTML = "";
 
 if(snap.empty){
-list.innerHTML = "<p>No posts found.</p>";
+
+list.innerHTML =
+"<p>No pending submissions.</p>";
+
 return;
+
 }
 
-snap.forEach(docSnap => {
+snap.forEach(docSnap=>{
 
 const d = docSnap.data();
 
-const div = document.createElement("div");
-div.className = "card";
+const card =
+document.createElement("div");
 
-div.innerHTML = `
-<h3>${d.title || ""}</h3>
+card.className = "card";
 
-<p class="small">Slug: ${d.slug || "none"}</p>
-<p class="small">Category: ${d.category || ""}</p>
-<p class="small">Views: ${d.views || 0}</p>
+card.innerHTML = `
 
-<img src="${d.media?.[0] || ""}">
+<h2>${safe(d.title)}</h2>
+
+<p class="small">
+Submitted by:
+${safe(d.email)}
+</p>
+
+<p class="small">
+Category:
+${safe(d.category)}
+</p>
+
+<p class="small">
+Promotion:
+${safe(d.promotionType)}
+</p>
 
 <label>Title</label>
-<input id="title-${docSnap.id}" value="${d.title || ""}">
+
+<input
+id="title-${docSnap.id}"
+value="${safe(d.title)}">
 
 <label>Slug</label>
-<input id="slug-${docSnap.id}" value="${d.slug || ""}">
+
+<input
+id="slug-${docSnap.id}"
+value="${safe(d.slug)}">
+
+<button
+onclick="generateSlug('${docSnap.id}')">
+Generate Slug
+</button>
 
 <label>Short Description</label>
-<textarea id="short-${docSnap.id}">${d.shortDescription || ""}</textarea>
 
-<label>Full Content</label>
-<textarea id="long-${docSnap.id}">${d.longDescription || ""}</textarea>
+<textarea
+id="short-${docSnap.id}">${safe(d.shortDescription)}</textarea>
+
+<label>Long Description</label>
+
+<textarea
+id="long-${docSnap.id}">${safe(d.longDescription)}</textarea>
 
 <label>Website URL</label>
-<input id="web-${docSnap.id}" value="${d.websiteUrl || ""}">
 
-<label>Affiliate Link</label>
-<input id="aff-${docSnap.id}" value="${d.affiliateLink || ""}">
+<input
+id="website-${docSnap.id}"
+value="${safe(d.websiteUrl)}">
 
-<div style="margin-top:10px;">
-<button class="view" onclick="openLink('${d.websiteUrl || ""}')">Open Link</button>
-<button class="save" onclick="savePost('${docSnap.id}')">Save</button>
-<button class="approve" onclick="publish('${docSnap.id}')">Publish</button>
-<button class="reject" onclick="reject('${docSnap.id}')">Reject</button>
+<label>Affiliate URL</label>
+
+<input
+id="affiliate-${docSnap.id}"
+value="${safe(d.affiliateLink)}">
+
+<label>Reject Reason</label>
+
+<input
+id="reject-${docSnap.id}"
+placeholder="Reason if rejected">
+
+${d.media?.[0] ? `
+
+<h3>Featured Image</h3>
+
+<img src="${d.media[0]}">
+
+` : ""}
+
+${d.paymentProof ? `
+
+<h3>Payment Proof</h3>
+
+<img src="${d.paymentProof}">
+
+` : ""}
+
+<div class="actions">
+
+<button
+class="visit"
+onclick="checkWebsite('${safe(d.websiteUrl)}')">
+Visit Website
+</button>
+
+<button
+class="visit"
+onclick="checkAffiliate('${safe(d.affiliateLink)}')">
+Visit Affiliate
+</button>
+
+<button
+class="save"
+onclick="savePending('${docSnap.id}')">
+Save Changes
+</button>
+
+<button
+class="approve"
+onclick="approveSubmission('${docSnap.id}')">
+Approve
+</button>
+
+<button
+class="reject"
+onclick="rejectSubmission('${docSnap.id}')">
+Reject
+</button>
+
 </div>
+
 `;
 
-list.appendChild(div);
+list.appendChild(card);
+
 });
 
 };
 
-/* OPEN LINK */
-window.openLink = function(url){
-if(!url) return alert("No URL");
+/* ==========================
+   GENERATE SLUG
+========================== */
+
+window.generateSlug = function(id){
+
+const title =
+document.getElementById(`title-${id}`).value;
+
+document.getElementById(
+`slug-${id}`
+).value = slugify(title);
+
+};
+
+/* ==========================
+   LINK CHECKER
+========================== */
+
+window.checkWebsite = function(url){
+
+if(!url){
+
+alert("No website URL");
+
+return;
+
+}
+
 window.open(url,"_blank");
+
 };
 
-/* SAVE EDITS */
-window.savePost = async function(id){
+window.checkAffiliate = function(url){
 
-await updateDoc(doc(db,"posts",id),{
-title: document.getElementById(`title-${id}`).value,
-slug: document.getElementById(`slug-${id}`).value,
-shortDescription: document.getElementById(`short-${id}`).value,
-longDescription: document.getElementById(`long-${id}`).value,
-websiteUrl: document.getElementById(`web-${id}`).value,
-affiliateLink: document.getElementById(`aff-${id}`).value,
-updatedAt: Date.now()
-});
+if(!url){
 
-alert("Saved successfully");
+alert("No affiliate URL");
+
+return;
+
+}
+
+window.open(url,"_blank");
+
 };
 
-/* PUBLISH */
-window.publish = async function(id){
+/* ==========================
+   SAVE EDITS
+========================== */
 
-const ref = doc(db,"posts",id);
-const snap = await getDoc(ref);
+window.savePending = async function(id){
+
+await updateDoc(
+doc(db,"businessSubmissions",id),
+{
+title:
+document.getElementById(
+`title-${id}`
+).value,
+
+slug:
+document.getElementById(
+`slug-${id}`
+).value,
+
+shortDescription:
+document.getElementById(
+`short-${id}`
+).value,
+
+longDescription:
+document.getElementById(
+`long-${id}`
+).value,
+
+websiteUrl:
+document.getElementById(
+`website-${id}`
+).value,
+
+affiliateLink:
+document.getElementById(
+`affiliate-${id}`
+).value
+
+}
+);
+
+alert("Changes saved");
+
+};
+
+/* ==========================
+   APPROVE
+========================== */
+
+window.approveSubmission =
+async function(id){
+
+const ref =
+doc(db,"businessSubmissions",id);
+
+const snap =
+await getDoc(ref);
 
 if(!snap.exists()) return;
 
 const d = snap.data();
 
-const slug = d.slug || makeSlug(d.title,id);
+const slug =
+document.getElementById(
+`slug-${id}`
+).value
+||
+slugify(
+document.getElementById(
+`title-${id}`
+).value
+);
+
+/* Create post */
+
+await setDoc(
+doc(db,"posts",id),
+{
+
+title:
+document.getElementById(
+`title-${id}`
+).value,
+
+slug,
+
+category:
+(d.category || "")
+.toLowerCase(),
+
+shortDescription:
+document.getElementById(
+`short-${id}`
+).value,
+
+longDescription:
+document.getElementById(
+`long-${id}`
+).value,
+
+media:
+d.media || [],
+
+affiliateLink:
+document.getElementById(
+`affiliate-${id}`
+).value,
+
+websiteUrl:
+document.getElementById(
+`website-${id}`
+).value,
+
+isSponsored:
+d.promotionType ===
+"sponsored",
+
+status:"published",
+
+views:0,
+
+createdAt:
+serverTimestamp()
+
+}
+);
+
+/* Mark approved */
 
 await updateDoc(ref,{
-status:"published",
-slug,
-publishedAt: Date.now()
+
+status:"approved",
+
+slug
+
 });
 
-alert("Published");
-loadPosts("pending");
+alert(
+"Post approved successfully"
+);
+
+loadPending();
+
 };
 
-/* REJECT */
-window.reject = async function(id){
+/* ==========================
+   REJECT
+========================== */
 
-await updateDoc(doc(db,"posts",id),{
-status:"rejected"
+window.rejectSubmission =
+async function(id){
+
+const reason =
+document.getElementById(
+`reject-${id}`
+).value;
+
+await updateDoc(
+doc(
+db,
+"businessSubmissions",
+id
+),
+{
+status:"rejected",
+rejectReason:
+reason ||
+"No reason provided"
+}
+);
+
+alert("Post rejected");
+
+loadPending();
+
+};
+
+/* ==========================
+   APPROVED POSTS
+========================== */
+
+window.loadApproved = async function(){
+
+const list =
+document.getElementById("list");
+
+list.innerHTML =
+"Loading approved posts...";
+
+const q = query(
+collection(db,"businessSubmissions"),
+where("status","==","approved")
+);
+
+const snap =
+await getDocs(q);
+
+list.innerHTML = "";
+
+if(snap.empty){
+
+list.innerHTML =
+"<p>No approved posts.</p>";
+
+return;
+
+}
+
+snap.forEach(docSnap=>{
+
+const d = docSnap.data();
+
+const card =
+document.createElement("div");
+
+card.className = "card";
+
+card.innerHTML = `
+
+<h2>${safe(d.title)}</h2>
+
+<p class="small">
+Slug: ${safe(d.slug)}
+</p>
+
+<p class="small">
+Category: ${safe(d.category)}
+</p>
+
+<p class="small">
+Status: APPROVED
+</p>
+
+<label>Title</label>
+<input
+id="approved-title-${docSnap.id}"
+value="${safe(d.title)}">
+
+<label>Slug</label>
+<input
+id="approved-slug-${docSnap.id}"
+value="${safe(d.slug)}">
+
+<label>Short Description</label>
+<textarea
+id="approved-short-${docSnap.id}">${safe(d.shortDescription)}</textarea>
+
+<label>Long Description</label>
+<textarea
+id="approved-long-${docSnap.id}">${safe(d.longDescription)}</textarea>
+
+<label>Website URL</label>
+<input
+id="approved-website-${docSnap.id}"
+value="${safe(d.websiteUrl)}">
+
+<label>Affiliate URL</label>
+<input
+id="approved-affiliate-${docSnap.id}"
+value="${safe(d.affiliateLink)}">
+
+${d.media?.[0] ? `
+<img src="${d.media[0]}">
+` : ""}
+
+<div id="analytics-${docSnap.id}"
+class="small">
+Loading analytics...
+</div>
+
+<div class="actions">
+
+<button
+class="visit"
+onclick="openLivePost('${safe(d.slug)}')">
+Open Live Post
+</button>
+
+<button
+class="analytics"
+onclick="loadAnalytics('${docSnap.id}')">
+Refresh Analytics
+</button>
+
+<button
+class="save"
+onclick="saveApproved('${docSnap.id}')">
+Save Changes
+</button>
+
+<button
+class="reject"
+onclick="moveApprovedToRejected('${docSnap.id}')">
+Reject
+</button>
+
+<button
+class="restore"
+onclick="restoreApprovedToPending('${docSnap.id}')">
+Move To Pending
+</button>
+
+</div>
+
+`;
+
+list.appendChild(card);
+
+loadAnalytics(docSnap.id);
+
 });
 
-alert("Rejected");
-loadPosts("pending");
+};
+
+/* ==========================
+   ANALYTICS
+========================== */
+
+window.loadAnalytics =
+async function(id){
+
+const postSnap =
+await getDoc(
+doc(db,"posts",id)
+);
+
+const el =
+document.getElementById(
+`analytics-${id}`
+);
+
+if(!postSnap.exists()){
+
+el.innerHTML =
+"Post not found in posts collection";
+
+return;
+
+}
+
+const d =
+postSnap.data();
+
+el.innerHTML = `
+
+Views:
+${d.views || 0}
+
+<br>
+
+Status:
+${d.status || "published"}
+
+`;
+
+};
+
+/* ==========================
+   OPEN LIVE POST
+========================== */
+
+window.openLivePost =
+function(slug){
+
+if(!slug){
+
+alert("No slug found");
+
+return;
+
+}
+
+window.open(
+`https://www.webwardrobe.name.ng/post.html?slug=${slug}`,
+"_blank"
+);
+
+};
+
+/* ==========================
+   SAVE APPROVED
+========================== */
+
+window.saveApproved =
+async function(id){
+
+const title =
+document.getElementById(
+`approved-title-${id}`
+).value;
+
+const slug =
+document.getElementById(
+`approved-slug-${id}`
+).value;
+
+const shortDescription =
+document.getElementById(
+`approved-short-${id}`
+).value;
+
+const longDescription =
+document.getElementById(
+`approved-long-${id}`
+).value;
+
+const websiteUrl =
+document.getElementById(
+`approved-website-${id}`
+).value;
+
+const affiliateLink =
+document.getElementById(
+`approved-affiliate-${id}`
+).value;
+
+/* update submission */
+
+await updateDoc(
+doc(db,"businessSubmissions",id),
+{
+title,
+slug,
+shortDescription,
+longDescription,
+websiteUrl,
+affiliateLink
+}
+);
+
+/* update live post */
+
+await updateDoc(
+doc(db,"posts",id),
+{
+title,
+slug,
+shortDescription,
+longDescription,
+websiteUrl,
+affiliateLink
+}
+);
+
+alert(
+"Live post updated"
+);
+
+};
+
+/* ==========================
+   APPROVED -> REJECTED
+========================== */
+
+window.moveApprovedToRejected =
+async function(id){
+
+await updateDoc(
+doc(
+db,
+"businessSubmissions",
+id
+),
+{
+status:"rejected"
+}
+);
+
+await updateDoc(
+doc(
+db,
+"posts",
+id
+),
+{
+status:"rejected"
+}
+);
+
+alert(
+"Moved to rejected"
+);
+
+loadApproved();
+
+};
+
+/* ==========================
+   APPROVED -> PENDING
+========================== */
+
+window.restoreApprovedToPending =
+async function(id){
+
+await updateDoc(
+doc(
+db,
+"businessSubmissions",
+id
+),
+{
+status:"pending"
+}
+);
+
+alert(
+"Moved back to pending"
+);
+
+loadApproved();
+
+};
+
+/* ==========================
+   REJECTED POSTS
+========================== */
+
+window.loadRejected = async function(){
+
+const list =
+document.getElementById("list");
+
+list.innerHTML =
+"Loading rejected posts...";
+
+const q = query(
+collection(db,"businessSubmissions"),
+where("status","==","rejected")
+);
+
+const snap =
+await getDocs(q);
+
+list.innerHTML = "";
+
+if(snap.empty){
+
+list.innerHTML =
+"<p>No rejected posts.</p>";
+
+return;
+
+}
+
+snap.forEach(docSnap=>{
+
+const d = docSnap.data();
+
+const card =
+document.createElement("div");
+
+card.className = "card";
+
+card.innerHTML = `
+
+<h2>${safe(d.title)}</h2>
+
+<p class="small">
+Category:
+${safe(d.category)}
+</p>
+
+<p class="small">
+Slug:
+${safe(d.slug)}
+</p>
+
+<p class="small">
+Reject Reason:
+${safe(d.rejectReason)}
+</p>
+
+${d.media?.[0] ? `
+<img src="${d.media[0]}">
+` : ""}
+
+<div class="actions">
+
+<button
+class="restore"
+onclick="restoreRejected('${docSnap.id}')">
+Restore To Pending
+</button>
+
+<button
+class="approve"
+onclick="approveRejected('${docSnap.id}')">
+Approve
+</button>
+
+<button
+class="reject"
+onclick="deleteRejected('${docSnap.id}')">
+Delete Permanently
+</button>
+
+</div>
+
+`;
+
+list.appendChild(card);
+
+});
+
+};
+
+/* ==========================
+   REJECTED -> PENDING
+========================== */
+
+window.restoreRejected =
+async function(id){
+
+await updateDoc(
+doc(
+db,
+"businessSubmissions",
+id
+),
+{
+status:"pending"
+}
+);
+
+alert(
+"Restored to pending"
+);
+
+loadRejected();
+
+};
+
+/* ==========================
+   REJECTED -> APPROVED
+========================== */
+
+window.approveRejected =
+async function(id){
+
+const ref =
+doc(
+db,
+"businessSubmissions",
+id
+);
+
+const snap =
+await getDoc(ref);
+
+if(!snap.exists()) return;
+
+const d =
+snap.data();
+
+const slug =
+d.slug ||
+slugify(d.title);
+
+/* publish again */
+
+await setDoc(
+doc(db,"posts",id),
+{
+
+title:d.title,
+
+slug,
+
+category:
+(d.category || "")
+.toLowerCase(),
+
+shortDescription:
+d.shortDescription || "",
+
+longDescription:
+d.longDescription || "",
+
+media:
+d.media || [],
+
+websiteUrl:
+d.websiteUrl || "",
+
+affiliateLink:
+d.affiliateLink || "",
+
+isSponsored:
+d.promotionType ===
+"sponsored",
+
+views:0,
+
+status:"published",
+
+createdAt:
+serverTimestamp()
+
+}
+);
+
+/* mark approved */
+
+await updateDoc(ref,{
+status:"approved",
+slug
+});
+
+alert(
+"Approved successfully"
+);
+
+loadRejected();
+
+};
+
+/* ==========================
+   DELETE REJECTED
+========================== */
+
+window.deleteRejected =
+async function(id){
+
+const confirmed =
+confirm(
+"Delete permanently?"
+);
+
+if(!confirmed) return;
+
+await deleteDoc(
+doc(
+db,
+"businessSubmissions",
+id
+)
+);
+
+alert(
+"Deleted permanently"
+);
+
+loadRejected();
+
 };
 
 </script>
